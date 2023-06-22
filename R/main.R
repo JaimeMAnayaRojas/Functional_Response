@@ -50,7 +50,7 @@ ggsave("plots/Batch_1.pdf", p1, width = 5, height = 5)
 
 # Now, compile the stan model
 
-model <- cmdstan_model("R/FR_modB2.stan")
+model <- cmdstan_model("stan/FR_model.stan")
 
 # Now, fit the model
 
@@ -161,10 +161,10 @@ p2 <- ggplot(df, aes(x = R, y = median, color = treatment)) +
     geom_ribbon(aes(ymin = lower, ymax = upper, fill = treatment), alpha = 0.2) +
     theme_bw() +
     labs(x = "Number of prey", y = "Number of prey consumed") +
-    ylim(0, 20) +
-    #geom_smooth(method = "smooth", se = FALSE) +
-    theme(legend.position = "none")
-
+    ylim(0, 11) +
+   # geom_smooth(method = "smooth", se = FALSE) +
+    theme(legend.position = "none") 
+  
 
 
 p2
@@ -172,6 +172,3 @@ p2
 # save p2 as a pdf file
 
 ggsave("plots/Batch_1.pdf", p2, width = 5, height = 5)
-git config --global user.email "jmanaya30@gmail.com"
-git config --global user.name "JaimeMAnayaRojas"
-

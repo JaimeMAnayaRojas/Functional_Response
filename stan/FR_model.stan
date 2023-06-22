@@ -13,14 +13,16 @@ data{
 }
 parameters{
   real a;
-  real b;
-  real h;
-  
   real a_I;
-  real h_I;
   real a_i;
+
+  real h;
   real h_i;
+  real h_I;
  
+  real b;
+  // real b_I;
+  // real b_i;
   
   
   vector[Nid] a_Intercept;
