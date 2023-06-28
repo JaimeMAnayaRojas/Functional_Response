@@ -16,6 +16,8 @@ library(readxl)
 data <- read_xlsx("data/Batch_1_2.xlsx")
 
 head(data)
+
+
 dim(data)
 unique(data$Treatment)
 # Create unique individual IDs, and change the name of columns
@@ -27,7 +29,12 @@ data %>%
   mutate(I = ifelse(Infection == "infected", 1,0), nI = ifelse(Infection == "exposed", 1,0)) -> data
 
 
+
 dim(data)
+
+summary(lm(Eaten ~ Infection, data = data))
+
+head(model.matrix(~ Infection, data = data))
 
 # plot Eaten ~ R, colored by Infection
 
@@ -48,11 +55,7 @@ ggsave("plots/Batch_1.pdf", p1, width = 5, height = 5)
 # First, create a stan file
 # Path: stan_models/functional_response.stan
 
-# Now, compile the stan model
 
-model <- cmdstan_model("stan/FR_model.stan")
-
-# Now, fit the model
 
 factor(data$ID) -> data$ID
 
@@ -65,8 +68,18 @@ dlist = list(
     R = data$R,
     Eaten = data$Eaten,
     I = data$I,
-    nI = data$nI
+    i = data$nI 
+    # pD = data$pD,
+    # Egg = as.integer(data$Egg). 1, 0
+    # cSize
+    # ISize = data$I * data$cSize 
   )
+
+# Now, fit the model
+# Now, compile the stan model
+
+model <- cmdstan_model("stan/FR_model.stan")
+
 
 fit <- model$sample(
     data = dlist,
@@ -76,12 +89,14 @@ fit <- model$sample(
     iter_sampling = 4000,
     refresh = 100,
     save_warmup = FALSE,
-    show_messages = TRUE
+    show_messages = TRUE, 
+    adapt_delta = 0.93,
+    
     )
 
 # get summary
 
-precis(fit, depth = 1)
+precis(fit, depth = 1, digits = 3)
 
 precis(fit, depth = 2)
 
@@ -89,7 +104,7 @@ precis(fit, depth = 2)
 
 post <- fit$draws(format = "df")
 
-
+# estimate the level of support for the hypothesis.
 LOS <- function(x){
 
     p = length(which(x> 0))/ length(x)
@@ -99,7 +114,14 @@ LOS <- function(x){
 
 }
 
-100- LOS(post$a_I)
+# is the effect of infection on atack rate positive?
+LOS(post$a_I) # % that is positive
+100 - LOS(post$a_I) # % that is negative
+
+# is the effect of infection on handling time positive?
+LOS(post$h_I) # % that is positive
+100 - LOS(post$h_I) # % that is negative
+
 
 # plot the functional response curves based on the posterior draws
 

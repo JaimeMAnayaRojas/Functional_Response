@@ -8,13 +8,17 @@ data{
   vector[N] Eaten;
   array[N] int ID;
   array[N] int I;
-  array[N] int nI;
+  array[N] int i;
   array[N] int R;
+  // array[N] int pD;
+  // vector[N] cSize;
+
 }
 parameters{
   real a;
-  real a_I;
-  real a_i;
+  real a_I; // effect of infection
+  real a_i; // effect of exposure but not infection
+  // real a_pD; // effect of previous diet
 
   real h;
   real h_i;
@@ -54,14 +58,14 @@ model{
   h_i ~ normal( 0 , 1 );
 
  
-  for ( i in 1:N ) {
-    A[i] = exp(a + a_I * I[i] + a_i * nI[i] + a_Intercept[ID[i]]);
-    H[i] = exp(h + h_I * I[i] + h_i * nI[i] + h_Intercept[ID[i]]);
-    B[i] = exp(b + b_Intercept[ID[i]]);
+  for ( j in 1:N ) {
+    A[j] = exp(a + a_I * I[j] + a_i *i[j] + a_Intercept[ID[j]]); // + a_pD *pD[j] 
+    H[j] = exp(h + h_I * I[j] + h_i * i[j] + h_Intercept[ID[j]]);
+    B[j] = exp(b + b_Intercept[ID[j]]);
     
 
     // FR[i] = (A[i]*(R[i])) / (1 + A[i]*H[i]*(R[i]) );
-    FR[i] = (A[i]*(R[i]^B[i])) / (1 + A[i]*H[i]*(R[i]^B[i]) );
+    FR[j] = (A[j]*(R[j]^B[j])) / (1 + A[j]*H[j]*(R[j]^B[j]) );
   }
   
   Eaten ~ normal( FR , sigma );
