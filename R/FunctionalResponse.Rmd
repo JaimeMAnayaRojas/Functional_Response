@@ -86,7 +86,9 @@ p1
 ## Size correlation in M.albidus and S.solidus 
 ```{r}
 # read in dataframe
-dff <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
+# dff <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
+dff <- read_xlsx("../data/Functional_response_data.xlsx")
+
 # remove rows with 0 in Cv column
 dff2 <- dff%>% 
         filter(Treatment != "infected LV", Treatment != "double infection", Treatment != "triple infection") %>% 
@@ -146,10 +148,10 @@ cor_coefs2 <- cor.test(dff1$Cv, dff1$relCon)
 Corr2<- ggplot(data = dff1, aes(x = Cv, y =relCon, fill=Treatment, color=Treatment)) + 
               geom_point(aes(fill=Treatment)) +
               geom_smooth(method = lm, aes(color=Treatment, fill=Treatment, group=Treatment), se = TRUE) +
-                annotate("text", x = 35000, y = 0.9, label = paste0("R: ", round(cor_coefs2$estimate, 2))) +
-                annotate("text", x = 35000, y = 0.85, label = paste0("p-value: ", round(cor_coefs2$p.value, 5)))+
-        ylim(0, 1) +
-        xlim(19500, 39000)+
+      #          annotate("text", x = 35000, y = 0.9, label = paste0("R: ", round(cor_coefs2$estimate, 2))) +
+      #          annotate("text", x = 35000, y = 0.85, label = paste0("p-value: ", round(cor_coefs2$p.value, 5)))+
+     #   ylim(0, 1) +
+       # xlim(19500, 39000)+
         theme_classic()+
         theme(text = element_text(size = 15), axis.title = element_text(size = 15), axis.text=element_text(color="black"))+
         labs(y="prey consumed/ prey density")+
@@ -225,6 +227,56 @@ pCor
 
 pCor2<-plot_grid(Corr2, pCor, labels="AUTO", label_size=12, ncol=1)
 pCor2
+
+
+## run ancova model: test if the relationship between copepod volumen and relative number of prey consume
+
+library(rstan)
+#install.packages("brms")
+library(brms)
+
+dff1$relCon[dff1$relCon==0] = 0.0001
+dff1$relCon[dff1$relCon==1] = 0.9999
+
+head(dff1)
+names(dff1)
+
+dff1$pc <- dff1$`prey consumed`
+dff1$pl <- dff1$`prey left`
+dff1$Cv <- (dff1$Cv - mean(dff1$Cv))/sd(dff1$Cv) 
+
+dff1$E <- ifelse(dff1$Treatment == "C", 0, 1  )
+ancova1 <- brm(pc | trials(prey) ~ Cv * E + (1|Block), family = binomial(), data =  dff1)
+summary(ancova1)
+
+# extract the posterios
+
+post1 <- as_draws_df(ancova1)
+
+head(post1)
+
+# what is the probability that infected copepods have a different relatioship comparet to control?
+
+100 * length(which(post1$"b_Cv:E" < 0)) / length(post1$"b_Cv") -100
+
+
+100 * length(which(post1$"b_Cv:TreatmentnI" < 0)) / length(post1$"b_Cv:TreatmentnI") 
+
+pE <- (post1$"b_Cv:TreatmentI" +  post1$"b_Cv:TreatmentnI")/2
+100 * length(which(pE < 0)) / length(post1$"b_Cv:TreatmentnI") 
+
+
+
+library(lme4)
+
+
+
+ancova2 <- glmer( relCon ~ Cv * Treatment + (1|Block), family = binomial(), data =  dff1)
+
+summary(ancova2)
+
+anova(ancova2)
+
 #dev.print(pdf,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Figures/Corr_FR_Cv_total.pdf",width=12, height=8) 
 ```
 # try density curves for volume and Nr. prey (gaußsche Verteilung)
@@ -244,7 +296,8 @@ library(readxl)
 
 ```{r}
 # load the data
-data <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
+# data <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
+data <- read_xlsx("../data/Functional_response_data.xlsx")
 
 head(data)
 
@@ -270,7 +323,7 @@ head(model.matrix(~ Infection, data = data))
 ```{r}
 # plot Eaten ~ R, colored by Infection
 ggplot(data, aes(x = R, y = Eaten, color = Infection)) +
-  geom_point() +
+  geom_jitter() +
   geom_smooth(method = "smooth", se = FALSE) +
   theme_bw() +  ylim(0, 20) + 
   labs(x = "Number of prey", y = "Number of prey consumed") -> p1
@@ -296,6 +349,7 @@ dlist = list(
     N = length(data$Eaten),
     Nid = length(unique(data$ID)),
     ID = as.integer(data$ID),
+    Block = as.integer(data$Block),
     R = data$R,
     Eaten = data$Eaten,
     I = data$I,
@@ -310,21 +364,29 @@ dlist = list(
 ```{r}
 # Now, compile the stan model
 
-model <- cmdstan_model("/Users/majadrakula/Desktop/Masterthesis/1_code/FR_model.stan")
+# model <- cmdstan_model("/Users/majadrakula/Desktop/Masterthesis/1_code/FR_model.stan")
 
+model <- cmdstan_model("../R/FR_model.stan")
 
-fit <- model$sample(
-    data = dlist,
-    chains = 4,
-    parallel_chains = 4,
-    iter_warmup = 2000,
-    iter_sampling = 4000,
-    refresh = 100,
-    save_warmup = FALSE,
-    show_messages = TRUE, 
-    adapt_delta = 0.93,
-    
-    )
+# 
+# fit <- model$sample(
+#     data = dlist,
+#     chains = 4,
+#     parallel_chains = 4,
+#     iter_warmup = 2000,
+#     iter_sampling = 4000,
+#     refresh = 100,
+#     save_warmup = FALSE,
+#     show_messages = TRUE, 
+#     adapt_delta = 0.9,
+#     
+#     )
+
+# save fit as as RDS
+
+saveRDS(fit, "model.RDS")
+
+fit <- readRDS("model.RDS")
 
 # get summary
 #rhat should be close to 1,0
@@ -355,8 +417,8 @@ LOS(post$h_I) # % that is positive
 100 - LOS(post$h_I) # % that is negative
 
 # effect of infection on b positive?
-LOS(post$b_I) # % that is positive
-100 - LOS(post$b_I) # % that is negative
+# LOS(post$b_I) # % that is positive
+# 100 - LOS(post$b_I) # % that is negative
 
 ```
 
@@ -382,14 +444,13 @@ p.link <- function(post, R, I, nI){
 
 # used sapply to apply the function to the posterior draws
 
-R <- seq(from=0, to =25, by =0.01)
+R <- seq(from=0, to =50, by =0.01)
 C <- sapply(1:length(R), function(j) p.link(post, R = R[j], I = 0, nI = 0))
-
 I <- sapply(1:length(R), function(j) p.link(post, R = R[j], I = 1, nI = 0))
-
 nI <- sapply(1:length(R), function(j) p.link(post, R = R[j], I = 0, nI = 1))
 
 
+# compare if the whole distribution of values of C is larger than I
 LOS(C - I)
 
 
@@ -456,6 +517,9 @@ dat$Treatment[dat$Treatment=="exposed"]<-"nI"
   #theme_bw() +  ylim(0, 20) + 
   #labs(x = "Number of prey", y = "Number of prey consumed") 
 #p5
-
+# plot Eaten ~ R, colored by Infection
+p3 + geom_jitter(data = dat, aes(x = R, y = Eaten, color = Treatment), alpha = 0.2)
+  
+sort(unique(data$R))
 
 ```
