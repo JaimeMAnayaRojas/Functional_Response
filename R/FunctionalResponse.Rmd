@@ -1,0 +1,461 @@
+---
+  title: "*C4*:The effect of a *Schistocephalus solidus* tapeworm infection on the functional response of *Macrocyclops albidus* copepods"
+author: "Maja Drakula"
+output: html_document
+date: "`r lubridate::today()`"
+abstract: |
+  blablabla<br><br><br>
+  output:
+  html_document:
+  toc: true
+toc_float: true
+toc_depth: 2
+number_sections: true
+code_folding: hide
+theme: paper
+---
+#Libraries
+```{r}
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(cowplot)
+library(ggpubr)
+library("readxl")
+```
+## Infectionrate & Survivalrate
+```{r}
+#Infectionrate
+# create dataframe
+dfirate <- data.frame (Treatment  = c("not infected", "infected"),
+                  Numbers = c(480, 56))
+# create pie chart
+dfir<- dfirate %>% 
+  arrange(desc(Treatment)) %>%
+  mutate(prop = Numbers / sum(Numbers/100), "%") %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop ) %>%
+  mutate_at(vars(prop), funs(round(., 2)))  
+
+dfir$percentage<- paste(dfir$prop, dfir$`"%"`)
+
+# Barplot to pie chart
+infection<- ggplot(dfir, aes(x="", y=prop, fill=Treatment)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void()+
+  geom_text(aes(y = ypos, label = percentage), color = "black", size=6) +
+  scale_fill_manual(values = c( "#339966", "#669900"))+
+  theme(text = element_text(size = 15))+
+  ggtitle("Infectionrate")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(legend.position="bottom",legend.title=element_blank())
+
+
+# Survivalrate
+# create dataframe
+dfsrate <- data.frame (Treatment  = c("died", "survived"),
+                  Numbers = c(29, 144))
+# create pie chart
+dfsr<- dfsrate %>% 
+  arrange(desc(Treatment)) %>%
+  mutate(prop = Numbers / sum(Numbers/100), "%") %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop ) %>%
+  mutate_at(vars(prop), funs(round(., 2)))  
+
+dfsr$percentage<- paste(dfsr$prop, dfsr$`"%"`)
+
+# Barplot to pie chart
+survive<- ggplot(dfsr, aes(x="", y=prop, fill=Treatment)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void()+
+  geom_text(aes(y = ypos, label = percentage), color = "black", size=6) +
+  scale_fill_manual(values = c("#339966", "#669900"))+
+  theme(text = element_text(size = 15))+
+  ggtitle("Survivalrate")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(legend.position="bottom", legend.title=element_blank())
+
+p1<-plot_grid(survive, infection, labels = "AUTO")
+
+p1
+#dev.print(pdf,"/Users/majadrakula/Desktop//Masterthesis/3_output/Figures_Tables/Figures/Piecharts.pdf", width=8, height=4) 
+```
+
+
+## Size correlation in M.albidus and S.solidus 
+```{r}
+# read in dataframe
+dff <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
+# remove rows with 0 in Cv column
+dff2 <- dff%>% 
+        filter(Treatment != "infected LV", Treatment != "double infection", Treatment != "triple infection") %>% 
+        filter(Cv!=0 & Pv!=0)
+
+# create correlarion plot 
+cor_coefs <- cor.test(dff2$Cv, dff2$Pv)
+Corr<- ggplot(data = dff2, aes(x = Cv, y = Pv)) + 
+              geom_point() +
+              geom_smooth(method=lm , color="purple", fill="#9966FF", se=TRUE) +
+                annotate("text", x = 18000, y = 2.0, label = paste0("R: ", round(cor_coefs$estimate, 2))) +
+                annotate("text", x = 18850, y = 1.9, label = paste0("p-value: ", round(cor_coefs$p.value, 10)))+
+        #ylim(0.2, 0.8) +
+        #xlim(19500, 26000)+
+        theme_classic()+
+        theme(text = element_text(size = 15), axis.title = element_text(size = 15), axis.text=element_text(color="black"))+
+        labs(y=expression(Procercoid~volume~("\u00D7"*10^5*µm^3)))+
+        labs(x=expression(Copepod~volume~("\u00D7"*10^5*µm^3)))
+
+Corr
+#dev.print(pdf,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Figures/Corr_Par_Cop.pdf",width=6, height=4) 
+```
+
+# plot comparison of sizes in infected and uninfected individuals
+```{r}
+dff1 <- dff%>% 
+        filter(Treatment != "infected LV", Treatment != "double infection", Treatment != "triple infection") %>% 
+        filter(Cv!=0)
+dff1$Treatment[dff1$Treatment=="control"]<-"C"
+dff1$Treatment[dff1$Treatment=="exposed"]<-"nI"
+dff1$Treatment[dff1$Treatment=="infected"]<-"I"
+dff1$Treatment <- factor(dff1$Treatment, levels=c("C", "I", "nI"))
+
+# calculate statistics
+compare_means(lengthC ~ Treatment, data = dff1)
+my_comparisons <- list( c("C", "I"), c("C", "nI"), c("I", "nI") )
+
+size<- ggplot(dff1, aes(x=Treatment, y=lengthC, fill=Treatment))+
+      geom_boxplot()+
+      theme_classic()+
+      labs(y = "Length (µm)", x="Treatment")+
+      theme(legend.position ="none" )+
+      scale_fill_brewer(palette="Accent")+
+      theme(text = element_text(size = 15), axis.title = element_text(size = 15), axis.text=element_text(color="black"))+
+      stat_compare_means(comparisons = my_comparisons) # Add pairwise comparisons p-value
+      #stat_compare_means(label.y = 50)     # Add global p-value
+size
+#dev.print(pdf,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Figures/Comparison_Length_Treatment.pdf",width=6, height=4) 
+```
+
+## Correlation of size and FR
+```{r}
+# create correlation plot 
+dff1$relCon<- dff1$`prey consumed`/dff1$prey
+
+cor_coefs2 <- cor.test(dff1$Cv, dff1$relCon)
+Corr2<- ggplot(data = dff1, aes(x = Cv, y =relCon, fill=Treatment, color=Treatment)) + 
+              geom_point(aes(fill=Treatment)) +
+              geom_smooth(method = lm, aes(color=Treatment, fill=Treatment, group=Treatment), se = TRUE) +
+                annotate("text", x = 35000, y = 0.9, label = paste0("R: ", round(cor_coefs2$estimate, 2))) +
+                annotate("text", x = 35000, y = 0.85, label = paste0("p-value: ", round(cor_coefs2$p.value, 5)))+
+        ylim(0, 1) +
+        xlim(19500, 39000)+
+        theme_classic()+
+        theme(text = element_text(size = 15), axis.title = element_text(size = 15), axis.text=element_text(color="black"))+
+        labs(y="prey consumed/ prey density")+
+        labs(x=expression(Copepod~volume~("\u00D7"*10^5*µm^3)))+
+        #scale_fill_brewer(palette="Accent")+
+        scale_color_manual(values=c("C" = "#339900","I"= "#9966FF", "nI" = "#FF9900"))+
+        scale_fill_manual(values=c("C" = "#339900","I"= "#9966FF", "nI" = "#FF9900"))+
+        theme(axis.title.x=element_blank())+
+        theme(legend.position = "none")
+Corr2
+# prepare mulitple plots next to each other
+# add column of relative consumption for each individual
+#dff1$relCon<- dff1$`prey consumed`/dff1$prey
+dffC <- dff1%>% 
+        filter(Treatment != "I", Treatment != "nI")
+dffI <- dff1%>% 
+        filter(Treatment != "C", Treatment != "nI")
+dffnI <- dff1%>% 
+        filter(Treatment != "C", Treatment != "I")
+# C
+cor_coefsC <- cor.test(dffC$Cv, dffC$relCon)
+CorrC<- ggplot(data = dffC, aes(x = Cv, y =relCon, fill=Treatment, color=Treatment)) + 
+              geom_point(alpha=0.5) +
+              geom_smooth(method=lm, color="green", fill="#69b3a2", se=TRUE) + 
+                annotate("text", x = 24000, y = 0.9, label = paste0("R: ", round(cor_coefsC$estimate, 2))) +
+                annotate("text", x = 24000, y = 0.85, label = paste0("p-value: ", round(cor_coefsC$p.value, 5)))+
+        #ylim(0.2, 0.8) +
+        #xlim(19500, 26000)+
+        theme_classic()+
+        theme(text = element_text(size = 12), axis.title = element_text(size = 12), axis.text=element_text(color="black"))+
+        labs(y="prey consumed/prey density")+
+        labs(x=expression(Copepod~volume~("\u00D7"*10^5*µm^3)))+
+        scale_color_manual(values=c("#339900"))+
+        theme(legend.position="bottom", legend.title =element_blank())+
+        ylim(0, 1) 
+
+#nI
+cor_coefsnI <- cor.test(dffnI$Cv, dffnI$relCon)
+CorrnI<- ggplot(data = dffnI, aes(x = Cv, y =relCon, fill=Treatment, color=Treatment)) + 
+              geom_point(alpha=0.5) +
+              geom_smooth(method=lm, color="orange", fill="#FF9900", se=TRUE) + 
+                annotate("text", x = 35000, y = 0.9, label = paste0("R: ", round(cor_coefsnI$estimate, 2))) +
+                annotate("text", x = 35000, y = 0.85, label = paste0("p-value: ", round(cor_coefsnI$p.value, 5)))+
+        xlim(14500, 40000)+
+        theme_classic()+
+        theme(text = element_text(size = 12), axis.title = element_text(size = 12), axis.text=element_text(color="black"))+
+        labs(y="")+
+        labs(x=expression(Copepod~volume~("\u00D7"*10^5*µm^3)))+
+        scale_color_manual(values=c("#FF9900"))+
+        theme(legend.position="bottom", legend.title = element_blank())+
+        ylim(0, 1)
+#I
+cor_coefsI <- cor.test(dffI$Cv, dffI$relCon)
+CorrI<- ggplot(data = dffI, aes(x = Cv, y =relCon, fill=Treatment, color=Treatment)) + 
+              geom_point(alpha=0.5) +
+              geom_smooth(method=lm, color="purple", fill="#9966FF", se=TRUE) + 
+                annotate("text", x = 29000, y = 0.9, label = paste0("R: ", round(cor_coefsI$estimate, 2))) +
+                annotate("text", x = 29000, y = 0.85, label = paste0("p-value: ", round(cor_coefsI$p.value, 5)))+
+        xlim(15500, 32000)+
+        theme_classic()+
+        theme(text = element_text(size = 12), axis.title = element_text(size = 12), axis.text=element_text(color="black"))+
+        labs(y="")+
+        labs(x=expression(Copepod~volume~("\u00D7"*10^5*µm^3)))+
+        scale_color_manual(values=c("#9966FF"))+
+        theme(legend.position="bottom", legend.title =element_blank())+
+        ylim(0, 1)
+# plot as grid
+pCor<-plot_grid(CorrC, CorrnI, CorrI, labels = c('B', 'C','D'), ncol=3, nrow=1, align="hv", label_size=12)
+
+pCor
+#dev.print(pdf,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Figures/Corr_FR_Cv.pdf",width=12, height=5) 
+
+
+pCor2<-plot_grid(Corr2, pCor, labels="AUTO", label_size=12, ncol=1)
+pCor2
+#dev.print(pdf,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Figures/Corr_FR_Cv_total.pdf",width=12, height=8) 
+```
+# try density curves for volume and Nr. prey (gaußsche Verteilung)
+
+# test the effects of *Schistocephalus solidus* infection on the functional response of *Macrocyclops albidus*
+```{r}
+# clean up the workspace
+rm(list = ls())
+
+# load the libraries
+library(ggplot2)
+library(dplyr)
+library(cmdstanr)
+library(rethinking)
+library(readxl)
+```
+
+```{r}
+# load the data
+data <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
+
+head(data)
+
+
+dim(data)
+unique(data$Treatment)
+
+# Create unique individual IDs, and change the name of columns
+data %>% 
+  mutate(ID = paste0(Plate, Individual)) %>% 
+  filter(Treatment != "infected LV", Treatment != "double infection", Treatment != "triple infection") %>% 
+  rename(R = prey, Infection = Treatment, Eaten = "prey consumed") %>%
+  mutate(I = ifelse(Infection == "infected", 1,0), nI = ifelse(Infection == "exposed", 1,0)) -> data
+
+
+dim(data)
+
+summary(lm(Eaten ~ Infection, data = data))
+
+head(model.matrix(~ Infection, data = data))
+```
+
+```{r}
+# plot Eaten ~ R, colored by Infection
+ggplot(data, aes(x = R, y = Eaten, color = Infection)) +
+  geom_point() +
+  geom_smooth(method = "smooth", se = FALSE) +
+  theme_bw() +  ylim(0, 20) + 
+  labs(x = "Number of prey", y = "Number of prey consumed") -> p1
+p1
+
+sort(unique(data$R))
+
+# save the plot as a pdf file
+#ggsave("plots/Batch_1.pdf", p1, width = 5, height = 5)
+```
+
+```{r}
+# Fit a stan model using cmdstanr
+# First, create a stan file
+# Path: stan_models/functional_response.stan
+# Now, fit the model
+
+factor(data$ID) -> data$ID
+
+levels(data$ID) <- c(1:length(levels(data$ID)))
+
+dlist = list(
+    N = length(data$Eaten),
+    Nid = length(unique(data$ID)),
+    ID = as.integer(data$ID),
+    R = data$R,
+    Eaten = data$Eaten,
+    I = data$I,
+    i = data$nI,
+    pD = data$`previous density` - 3,
+    Egg = as.integer(data$Eggs)
+    # cSize = as.integer(data$copepodsize),
+    # ISize = data$Iparasitesize * data$copepodsize 
+  )
+```
+
+```{r}
+# Now, compile the stan model
+
+model <- cmdstan_model("/Users/majadrakula/Desktop/Masterthesis/1_code/FR_model.stan")
+
+
+fit <- model$sample(
+    data = dlist,
+    chains = 4,
+    parallel_chains = 4,
+    iter_warmup = 2000,
+    iter_sampling = 4000,
+    refresh = 100,
+    save_warmup = FALSE,
+    show_messages = TRUE, 
+    adapt_delta = 0.93,
+    
+    )
+
+# get summary
+#rhat should be close to 1,0
+precis(fit, depth = 1, digits = 3)
+
+precis(fit, depth = 2)
+
+# get posteriors from fit
+
+post <- fit$draws(format = "df")
+```
+
+```{r}
+# estimate the level of support for the hypothesis.
+LOS <- function(x){
+
+    p = length(which(x> 0))/ length(x)
+
+    return(p*100)
+}
+
+# is the effect of infection on attack rate positive?
+LOS(post$a_I) # % that is positive
+100 - LOS(post$a_I) # % that is negative
+
+# is the effect of infection on handling time positive?
+LOS(post$h_I) # % that is positive
+100 - LOS(post$h_I) # % that is negative
+
+# effect of infection on b positive?
+LOS(post$b_I) # % that is positive
+100 - LOS(post$b_I) # % that is negative
+
+```
+
+```{r}
+# plot the functional response curves based on the posterior draws
+
+# write predicted values function
+
+p.link <- function(post, R, I, nI){
+    
+    A = exp(post$a + post$a_I*I + post$a_i*nI)
+
+    H = exp(post$h + post$h_I*I + post$h_i*nI)
+
+    B = exp(post$b)
+
+    p <- (A * (R^B)) / (1 + A * H * (R^B))
+
+    return(p)
+
+}
+
+
+# used sapply to apply the function to the posterior draws
+
+R <- seq(from=0, to =25, by =0.01)
+C <- sapply(1:length(R), function(j) p.link(post, R = R[j], I = 0, nI = 0))
+
+I <- sapply(1:length(R), function(j) p.link(post, R = R[j], I = 1, nI = 0))
+
+nI <- sapply(1:length(R), function(j) p.link(post, R = R[j], I = 0, nI = 1))
+
+
+LOS(C - I)
+
+
+# put the median and 95% HPD intervals in a data frame for each treatment (C, I, nI)
+
+medians <- c(apply(C, 2, median), apply(I, 2, median), apply(nI, 2, median))
+CI = rbind(t(apply(C, 2, HPDI, prob = 0.95)), t(apply(I, 2, HPDI, prob = 0.95)), t(apply(nI, 2, HPDI, prob = 0.95)))
+
+
+
+df <- data.frame(
+    R = rep(R, 3),
+    median = medians,
+    lower = CI[,1],
+    upper = CI[,2],
+    Treatment = rep(c("C", "I", "nI"), each = length(R))
+
+)
+df
+
+
+# plot the functional response curves adding lower and upper 95% HPD intervals as ribbons
+
+p2 <- ggplot(df, aes(x = R, y = median, color = Treatment)) +
+    geom_line() +
+    geom_ribbon(aes(ymin = lower, ymax = upper, fill = Treatment), alpha = 0.2) +
+    theme_bw() +
+    labs(x = "Number of prey", y = "Number of prey consumed") +
+    ylim(0, 11) 
+   # geom_smooth(method = "smooth", se = FALSE) +
+    #theme(legend.position = "none") 
+p2
+#dev.print(pdf,"",width=5, height=5) 
+```
+
+
+```{r}
+p3 <- ggplot(df, aes(x = R, y = median, color = Treatment)) +
+    geom_line(size=1) +
+    geom_ribbon(aes(ymin = lower, ymax = upper, fill = Treatment), alpha = 0.2, show.legend = FALSE, size=0.01) +
+    theme_classic() +
+    labs(x = "Number of prey", y = "Number of prey consumed") +
+    ylim(0, 11)+
+    scale_x_continuous(expand = c(0, 0), limits = c(0, NA)) + 
+    scale_y_continuous(expand = c(0, 0), limits = c(0, NA))+
+    scale_fill_brewer(palette="Accent") +
+    scale_color_manual(values=c("#339900", "#9966FF", "#FF9900"))+
+    theme(text = element_text(size = 12), axis.title = element_text(size = 12), axis.text=element_text(color="black"))+
+    theme(legend.position ="bottom" )
+
+p3
+dev.print(pdf,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Figures/FR.pdf",width=6, height=4) 
+
+#Using rename()
+dat <- data %>% 
+       rename("Treatment" = "Infection") 
+dat$Treatment[dat$Treatment=="control"]<-"C"
+dat$Treatment[dat$Treatment=="infected"]<-"I"
+dat$Treatment[dat$Treatment=="exposed"]<-"nI"
+
+#p5 <-p3 +
+#  geom_point(dat, aes(x = R, y = Eaten, color = Infection)) +
+#  geom_smooth(method = "smooth", se = FALSE) 
+  #theme_bw() +  ylim(0, 20) + 
+  #labs(x = "Number of prey", y = "Number of prey consumed") 
+#p5
+
+
+```
