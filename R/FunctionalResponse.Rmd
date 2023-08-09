@@ -14,7 +14,7 @@ number_sections: true
 code_folding: hide
 theme: paper
 ---
-#Libraries
+# Libraries
 ```{r}
 library(dplyr)
 library(ggplot2)
@@ -163,15 +163,15 @@ Corr2<- ggplot(data = dff1, aes(x = Cv, y =relCon, fill=Treatment, color=Treatme
         theme(legend.position = "none")
 Corr2
 # prepare mulitple plots next to each other
-# add column of relative consumption for each individual
-#dff1$relCon<- dff1$`prey consumed`/dff1$prey
+#add column of relative consumption for each individual
+dff1$relCon<- dff1$`prey consumed`/dff1$prey
 dffC <- dff1%>% 
         filter(Treatment != "I", Treatment != "nI")
 dffI <- dff1%>% 
         filter(Treatment != "C", Treatment != "nI")
 dffnI <- dff1%>% 
         filter(Treatment != "C", Treatment != "I")
-# C
+ 
 cor_coefsC <- cor.test(dffC$Cv, dffC$relCon)
 CorrC<- ggplot(data = dffC, aes(x = Cv, y =relCon, fill=Treatment, color=Treatment)) + 
               geom_point(alpha=0.5) +
@@ -296,10 +296,10 @@ library(readxl)
 
 ```{r}
 # load the data
-# data <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
-data <- read_xlsx("../data/Functional_response_data.xlsx")
+data <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
+#data <- read_xlsx("../data/Functional_response_data.xlsx")
 
-head(data)
+#head(data)
 
 
 dim(data)
@@ -326,10 +326,12 @@ ggplot(data, aes(x = R, y = Eaten, color = Infection)) +
   geom_jitter() +
   geom_smooth(method = "smooth", se = FALSE) +
   theme_bw() +  ylim(0, 20) + 
-  labs(x = "Number of prey", y = "Number of prey consumed") -> p1
+  labs(x = "Number of prey", y = "Number of prey consumed") +
+  scale_color_manual(values=c("control" = "#339900","infected"= "#9966FF", "exposed" = "#FF9900"))+
+  theme_classic()-> p1
 p1
 
-sort(unique(data$R))
+#sort(unique(data$R))
 
 # save the plot as a pdf file
 #ggsave("plots/Batch_1.pdf", p1, width = 5, height = 5)
@@ -356,8 +358,6 @@ dlist = list(
     i = data$nI,
     pD = data$`previous density` - 3,
     Egg = as.integer(data$Eggs)
-    # cSize = as.integer(data$copepodsize),
-    # ISize = data$Iparasitesize * data$copepodsize 
   )
 ```
 
@@ -388,9 +388,15 @@ saveRDS(fit, "model.RDS")
 
 fit <- readRDS("model.RDS")
 
+
+
 # get summary
 #rhat should be close to 1,0
-precis(fit, depth = 1, digits = 3)
+sum <- precis(fit, depth = 1, digits = 3)
+
+# save table
+library(openxlsx)
+write.xlsx(sum,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Tables/posterior_sum.xlsx", row.names=TRUE, digits=2)
 
 precis(fit, depth = 2)
 
@@ -415,11 +421,6 @@ LOS(post$a_I) # % that is positive
 # is the effect of infection on handling time positive?
 LOS(post$h_I) # % that is positive
 100 - LOS(post$h_I) # % that is negative
-
-# effect of infection on b positive?
-# LOS(post$b_I) # % that is positive
-# 100 - LOS(post$b_I) # % that is negative
-
 ```
 
 ```{r}
@@ -444,7 +445,7 @@ p.link <- function(post, R, I, nI){
 
 # used sapply to apply the function to the posterior draws
 
-R <- seq(from=0, to =50, by =0.01)
+R <- seq(from=0, to =25, by =0.01)
 C <- sapply(1:length(R), function(j) p.link(post, R = R[j], I = 0, nI = 0))
 I <- sapply(1:length(R), function(j) p.link(post, R = R[j], I = 1, nI = 0))
 nI <- sapply(1:length(R), function(j) p.link(post, R = R[j], I = 0, nI = 1))
@@ -453,12 +454,10 @@ nI <- sapply(1:length(R), function(j) p.link(post, R = R[j], I = 0, nI = 1))
 # compare if the whole distribution of values of C is larger than I
 LOS(C - I)
 
-
 # put the median and 95% HPD intervals in a data frame for each treatment (C, I, nI)
 
 medians <- c(apply(C, 2, median), apply(I, 2, median), apply(nI, 2, median))
 CI = rbind(t(apply(C, 2, HPDI, prob = 0.95)), t(apply(I, 2, HPDI, prob = 0.95)), t(apply(nI, 2, HPDI, prob = 0.95)))
-
 
 
 df <- data.frame(
@@ -470,56 +469,261 @@ df <- data.frame(
 
 )
 df
-
-
-# plot the functional response curves adding lower and upper 95% HPD intervals as ribbons
-
-p2 <- ggplot(df, aes(x = R, y = median, color = Treatment)) +
-    geom_line() +
-    geom_ribbon(aes(ymin = lower, ymax = upper, fill = Treatment), alpha = 0.2) +
-    theme_bw() +
-    labs(x = "Number of prey", y = "Number of prey consumed") +
-    ylim(0, 11) 
-   # geom_smooth(method = "smooth", se = FALSE) +
-    #theme(legend.position = "none") 
-p2
-#dev.print(pdf,"",width=5, height=5) 
 ```
 
-
+### Effect of infection on the Functional Response
 ```{r}
+# plot the functional response curves adding lower and upper 95% HPD intervals as ribbons
+
 p3 <- ggplot(df, aes(x = R, y = median, color = Treatment)) +
-    geom_line(size=1) +
-    geom_ribbon(aes(ymin = lower, ymax = upper, fill = Treatment), alpha = 0.2, show.legend = FALSE, size=0.01) +
+    geom_ribbon(aes(ymin = lower, ymax = upper, fill = Treatment), alpha = 0.6, show.legend = FALSE, size=0.01) +
+    geom_line(size=1, alpha=4) +
     theme_classic() +
     labs(x = "Number of prey", y = "Number of prey consumed") +
     ylim(0, 11)+
     scale_x_continuous(expand = c(0, 0), limits = c(0, NA)) + 
     scale_y_continuous(expand = c(0, 0), limits = c(0, NA))+
     scale_fill_brewer(palette="Accent") +
-    scale_color_manual(values=c("#339900", "#9966FF", "#FF9900"))+
+    scale_color_manual(values=c("C"= "#339900", "I"= "#9966FF","nI"= "#FF9900"))+
+    scale_fill_manual(values=c("C"= "#339900", "I"= "#9966FF","nI"= "#FF9900"))+
     theme(text = element_text(size = 12), axis.title = element_text(size = 12), axis.text=element_text(color="black"))+
-    theme(legend.position ="bottom" )
-
+    theme(legend.position ="right" )
 p3
-dev.print(pdf,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Figures/FR.pdf",width=6, height=4) 
 
-#Using rename()
+#Using rename() to fit column names 
 dat <- data %>% 
        rename("Treatment" = "Infection") 
 dat$Treatment[dat$Treatment=="control"]<-"C"
 dat$Treatment[dat$Treatment=="infected"]<-"I"
 dat$Treatment[dat$Treatment=="exposed"]<-"nI"
 
-#p5 <-p3 +
-#  geom_point(dat, aes(x = R, y = Eaten, color = Infection)) +
-#  geom_smooth(method = "smooth", se = FALSE) 
-  #theme_bw() +  ylim(0, 20) + 
-  #labs(x = "Number of prey", y = "Number of prey consumed") 
-#p5
 # plot Eaten ~ R, colored by Infection
-p3 + geom_jitter(data = dat, aes(x = R, y = Eaten, color = Treatment), alpha = 0.2)
-  
-sort(unique(data$R))
+FR<- p3 + geom_jitter(data = dat, aes(x = R, y = Eaten, color = Treatment), alpha = 0.25)
+FR  
+#sort(unique(data$R))
 
+# save plot
+#dev.print(pdf,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Figures/FR.pdf",width=6, height=4) 
 ```
+
+```{r}
+# Comparing Handling time and attack coefficient estimates by treatment 
+# create dataframe containing median and 95% HPD intervals for each treatment (C, I, nI)
+selection <- subset(sum, rownames(sum) %in% c("a", "a_I", "a_i", "h", "h_I", "h_i"))
+selection$Group <- rownames(selection)
+rownames(sum) <- NULL
+
+# add estimates column 
+sel <- selection %>%
+  mutate(Estimates = case_when(
+    Group %in% c("a","a_I", "a_i") ~ "attack rate",
+    Group %in% c("h","h_I", "h_i") ~ "handling time",
+    TRUE ~ Group
+  ))
+
+# add treatment column
+Estimates <- sel %>%
+  mutate(Treatment = case_when(
+    Group %in% c("a") ~ "C",
+    Group %in% c("h") ~ "C",
+    Group %in% c("a_I") ~ "I",
+    Group %in% c("h_I") ~ "I",
+    Group %in% c("a_i") ~ "nI",
+    Group %in% c("h_i") ~ "nI",
+    TRUE ~ Group
+  ))
+Est<- Estimates
+
+# plot
+
+
+# second attempt
+AC = exp(post$a)
+AI = exp(post$a_I)
+AnI = exp(post$a_i)
+
+HC = exp(post$h)
+HI = exp(post$h_I)
+HnI = exp(post$h_i)
+
+mediansEst <- c(apply(AC, 2, median), apply(AI, 2, median), apply(AnI, 2, median), apply(HC, 2, median), apply(HI, 2, median), apply(HnI, 2, median))
+CIEst = rbind(t(apply(AC, 2, HPDI, prob = 0.95)), t(apply(AI, 2, HPDI, prob = 0.95)), t(apply(AnI, 2, HPDI, prob = 0.95)), apply(HC, 2, HPDI, prob = 0.95)), t(apply(HI, 2, HPDI, prob = 0.95)), t(apply(HnI, 2, HPDI, prob = 0.95)))
+```
+
+### Effect of exposure to Functional Response 
+```{r}
+# clean up the workspace
+rm(list = ls())
+
+# load the libraries
+library(ggplot2)
+library(dplyr)
+library(cmdstanr)
+library(rethinking)
+library(readxl)
+
+# load the data
+data <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
+#data <- read_xlsx("../data/Functional_response_data.xlsx")
+
+#head(data)
+#dim(data)
+#unique(data$Treatment)
+
+# Create unique individual IDs, and change the name of columns
+data2<-data %>% 
+  mutate(ID = paste0(Plate, Individual)) %>% 
+  filter(Treatment != "infected LV", Treatment != "double infection", Treatment != "triple infection") %>% 
+  rename(R = "prey", Infection = "Treatment", Eaten = "prey consumed") %>% 
+  mutate(C = ifelse(Infection == "control", 0,1),
+         E = ifelse(Infection %in% c("infected", "exposed"), 1,0)) 
+
+
+# Fit a stan model using cmdstanr
+# First, create a stan file
+# Path: stan_models/functional_response.stan
+# Now, fit the model
+
+factor(data2$ID) -> data2$ID
+
+levels(data2$ID) <- c(1:length(levels(data2$ID)))
+
+dlist2 = list(
+    N = length(data2$Eaten),
+    Nid = length(unique(data2$ID)),
+    ID = as.integer(data2$ID),
+    Block = as.integer(data2$Block),
+    R = data2$R,
+    Eaten = data2$Eaten,
+    E = data2$E,
+    pD = data2$`previous density` - 3,
+    Egg = as.integer(data2$Eggs)
+  )
+# Now, compile the stan model
+
+# model <- cmdstan_model("/Users/majadrakula/Desktop/Masterthesis/1_code/FR_modelE.stan")
+
+model <- cmdstan_model("../R/FR_modelE.stan")
+
+ 
+ fitE <- model$sample(
+     data = dlist,
+     chains = 4,
+     parallel_chains = 4,
+     iter_warmup = 2000,
+     iter_sampling = 4000,
+     refresh = 100,
+     save_warmup = FALSE,
+     show_messages = TRUE, 
+     adapt_delta = 0.9,
+     
+     )
+
+# save fit as as RDS
+
+saveRDS(fitE, "modelE.RDS")
+
+fitE <- readRDS("modelE.RDS")
+
+
+
+# get summary
+#rhat should be close to 1,0
+sumE <- precis(fitE, depth = 1, digits = 3)
+
+# save table
+library(openxlsx)
+write.xlsx(sumE,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Tables/posterior_sumE.xlsx", row.names=TRUE, digits=2)
+
+precis(fitE, depth = 2)
+
+# get posteriors from fit
+
+postE <- fitE$draws(format = "dfE")
+
+# estimate the level of support for the hypothesis.
+LOS <- function(x){
+
+    p = length(which(x> 0))/ length(x)
+
+    return(p*100)
+}
+
+# is the effect of infection on attack rate positive?
+LOS(postE$a_E) # % that is positive
+100 - LOS(postE$a_E) # % that is negative
+
+# is the effect of infection on handling time positive?
+LOS(postE$h_E) # % that is positive
+100 - LOS(postE$h_E) # % that is negative
+
+# plot the functional response curves based on the posterior draws
+
+# write predicted values function
+
+p.link <- function(post, R, E){
+    
+    A = exp(post$a + post$a_E*E)
+
+    H = exp(post$h + post$h_E*E)
+
+    B = exp(post$b)
+
+    p <- (A * (R^B)) / (1 + A * H * (R^B))
+
+    return(p)
+
+}
+
+
+# used sapply to apply the function to the posterior draws
+
+R <- seq(from=0, to =25, by =0.01)
+C <- sapply(1:length(R), function(j) p.link(post, R = R[j], E = 0))
+E <- sapply(1:length(R), function(j) p.link(post, R = R[j], E = 1))
+
+
+
+# compare if the whole distribution of values of C is larger than I
+LOS(C - E)
+
+# put the median and 95% HPD intervals in a data frame for each treatment (C, I, nI)
+
+mediansE <- c(apply(C, 2, median), apply(E, 2, median))
+CIE = rbind(t(apply(C, 2, HPDI, prob = 0.95)), t(apply(E, 2, HPDI, prob = 0.95)))
+
+
+dfE <- data.frame(
+    R = rep(R, 3),
+    median = mediansE,
+    lower = CIE[,1],
+    upper = CIE[,2],
+    Treatment = rep(c("C", "E"), each = length(R))
+
+)
+df
+```
+
+
+```{r}
+# plot data
+FRE <- ggplot(dfE, aes(x = R, y = median, color = Group)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper, fill = Group), alpha = 0.2, show.legend = FALSE, size=0.01) +
+    geom_line(size=0.5, alpha=2) +
+    theme_classic() +
+    labs(x = "Number of prey", y = "Number of prey consumed") +
+    ylim(0, 11)+
+    scale_x_continuous(expand = c(0, 0), limits = c(0, NA)) + 
+    scale_y_continuous(expand = c(0, 0), limits = c(0, NA))+
+    scale_color_manual(values=c("C"= "#339900", "E"="#999999"))+
+    scale_fill_manual(values=c("C"= "#339900", "E"="#999999"))+
+    theme(text = element_text(size = 12), axis.title = element_text(size = 12), axis.text=element_text(color="black"))+
+    theme(legend.position ="right" )
+FRE
+
+E <- I + nI
+LOS(C - E)
+LOS(E-C)
+```
+
+
