@@ -297,7 +297,7 @@ library(readxl)
 ```{r}
 # load the data
 data <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
-#data <- read_xlsx("../data/Functional_response_data.xlsx")
+data <- read_xlsx("../data/Functional_response_data.xlsx")
 
 #head(data)
 
@@ -368,25 +368,26 @@ dlist = list(
 
 model <- cmdstan_model("../R/FR_model.stan")
 
-# 
-# fit <- model$sample(
-#     data = dlist,
-#     chains = 4,
-#     parallel_chains = 4,
-#     iter_warmup = 2000,
-#     iter_sampling = 4000,
-#     refresh = 100,
-#     save_warmup = FALSE,
-#     show_messages = TRUE, 
-#     adapt_delta = 0.9,
-#     
-#     )
+
+fit <- model$sample(
+    data = dlist,
+    chains = 4,
+    parallel_chains = 4,
+    iter_warmup = 3000,
+    iter_sampling = 4000,
+    refresh = 100,
+    save_warmup = FALSE,
+    show_messages = TRUE,
+    adapt_delta = 0.93,
+
+    )
 
 # save fit as as RDS
 
 saveRDS(fit, "model.RDS")
 
-fit <- readRDS("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/model.RDS")
+# fit <- readRDS("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/model.RDS")
+fit <- readRDS("../R/model.RDS")
 
 
 
@@ -434,9 +435,9 @@ p.link <- function(post, R, I, nI){
 
     H = exp(post$h + post$h_I*I + post$h_i*nI)
 
-    B = exp(post$b)
+    
 
-    p <- (A * (R^B)) / (1 + A * H * (R^B))
+    p <- (A * (R)) / (1 + A * H * (R))
 
     return(p)
 
@@ -476,7 +477,7 @@ df
 # plot the functional response curves adding lower and upper 95% HPD intervals as ribbons
 
 p3 <- ggplot(df, aes(x = R, y = median, color = Treatment)) +
-    geom_ribbon(aes(ymin = lower, ymax = upper, fill = Treatment), alpha = 0.6, show.legend = FALSE, size=0.01) +
+    geom_ribbon(aes(ymin = lower, ymax = upper, fill = Treatment), alpha = 0.25, show.legend = FALSE, size=0.01) +
     geom_line(size=1, alpha=4) +
     theme_classic() +
     labs(x = "Number of prey", y = "Number of prey consumed") +
@@ -501,6 +502,7 @@ dat$Treatment[dat$Treatment=="exposed"]<-"nI"
 FR<- p3 + geom_jitter(data = dat, aes(x = R, y = Eaten, color = Treatment), alpha = 0.25)
 FR  
 #sort(unique(data$R))
+
 
 # save plot
 #dev.print(pdf,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Figures/FR.pdf",width=6, height=4) 
@@ -586,7 +588,7 @@ library(readxl)
 
 # load the data
 data <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
-#data <- read_xlsx("../data/Functional_response_data.xlsx")
+data <- read_xlsx("../data/Functional_response_data.xlsx")
 
 #head(data)
 #dim(data)
@@ -624,7 +626,7 @@ dlist2 = list(
 
 model <- cmdstan_model("/Users/majadrakula/Desktop/Masterthesis/1_code/FR_modelE.stan")
 
-#model <- cmdstan_model("../R/FR_modelE.stan")
+model <- cmdstan_model("../R/FR_modelE.stan")
 
  
  fitE <- model$sample(
@@ -637,6 +639,7 @@ model <- cmdstan_model("/Users/majadrakula/Desktop/Masterthesis/1_code/FR_modelE
      save_warmup = FALSE,
      show_messages = TRUE, 
      adapt_delta = 0.9,
+     seed = 123
      
      )
 
@@ -671,8 +674,8 @@ LOS <- function(x){
 }
 
 # is the effect of infection on attack rate positive?
-LOS(postE$a_E) # % that is positive
-100 - LOS(postE$a_E) # % that is negative
+100-LOS(postE$a_E) # % that is positive
+LOS(postE$a_E) # % that is negative
 
 # is the effect of infection on handling time positive?
 LOS(postE$h_E) # % that is positive
@@ -711,26 +714,26 @@ LOS(C - E)
 # put the median and 95% HPD intervals in a data frame for each treatment (C, I, nI)
 
 mediansE <- c(apply(C, 2, median), apply(E, 2, median))
- CIE <- rbind(t(apply(C, 2, HPDI, prob = 0.95)), t(apply(E, 2, HPDI, prob = 0.95)))
+CIE <- rbind(t(apply(C, 2, HPDI, prob = 0.95)), t(apply(E, 2, HPDI, prob = 0.95)))
 
 
- dfE <- data.frame(
+dfE <- data.frame(
     R = rep(R, 2),
-    #median = mediansE,
-    #lower = CIE[,1],
-    #upper = CIE[,2],
+    median = mediansE,
+    lower = CIE[,1],
+    upper = CIE[,2],
     Treatment = rep(c("C", "E"), each = length(R))
 
 )
 dfE
-rep(c("C","E"), each= 10)
+
 ```
 
 
 ```{r}
 # plot data
-FRE <- ggplot(dfE, aes(x = R, y = median, color = Group)) +
-    geom_ribbon(aes(ymin = lower, ymax = upper, fill = Group), alpha = 0.2, show.legend = FALSE, size=0.01) +
+FRE <- ggplot(dfE, aes(x = R, y = median, color = Treatment)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper, fill = Treatment), alpha = 0.2, show.legend = FALSE, size=0.01) +
     geom_line(size=0.5, alpha=2) +
     theme_classic() +
     labs(x = "Number of prey", y = "Number of prey consumed") +
@@ -743,9 +746,36 @@ FRE <- ggplot(dfE, aes(x = R, y = median, color = Group)) +
     theme(legend.position ="right" )
 FRE
 
-E <- I + nI
-LOS(C - E)
 LOS(E-C)
 ```
 
+```{r}
+
+ids = c(which(names(post)== "pFR[1]"),
+which(names(post)== "pFR[951]"))
+preditedVals <- post[, ids[1]:ids[2]]
+
+head(preditedVals)
+
+pmed <- apply(preditedVals, 2, median)
+pci <- t(apply(preditedVals, 2, HPDI, prob= 0.95))
+
+
+pddf <- data_frame(Medians = pmed, 
+                   lower = pci[,1], 
+                   upper = pci[,2],
+                   Observed = data$Eaten)
+
+
+plot(pmed ~ data$Eaten)
+abline(0,1)
+
+## plot in ggplot
+
+ggplot(pddf, aes(x = Observed, y = Medians)) + 
+  geom_point(alpha = 0.1) + geom_errorbar(aes(ymin = lower, ymax =upper), alpha = 0.1) + 
+  geom_abline(slope=1, intercept=0, color="red")
+  
+
+```
 
