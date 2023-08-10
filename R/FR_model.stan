@@ -33,7 +33,7 @@ parameters{
   // real h_ISize;
   real h_Egg;
   
-  real b;
+  
 
   // real b_pD; // effect of previous diet
   // real b_cSize;
@@ -41,68 +41,53 @@ parameters{
   // real b_Egg; 
   
   vector[Nid] a_Intercept;
-  vector[Nid] b_Intercept;
+  
   vector[Nid] h_Intercept;
   
   vector[Nid] ab_Intercept;
-  vector[Nid] bb_Intercept;
+  
   vector[Nid] hb_Intercept;
   
   real<lower=0> sigma_ID;
-  real<lower=0> sigma_B;
+  // real<lower=0> sigma_B;
   real sigma;
 }
 
 model{
   vector[N] FR;
   vector[N] A;
-  vector[N] B;
+  // vector[N] B;
   vector[N] H;
   
   sigma ~ cauchy( 0 , 1 );
-  sigma_ID ~ cauchy( 0 , 2 );
+  sigma_ID ~ cauchy( 0 , 1 );
+  // sigma_B ~ cauchy( 0 , 1 );
   a_Intercept ~ normal( 0 , sigma_ID );
-  b_Intercept ~ normal( 0 , sigma_ID );
   h_Intercept ~ normal( 0 , sigma_ID );
   
-  ab_Intercept ~ normal( 0 , sigma_B );
-  bb_Intercept ~ normal( 0 , sigma_B );
-  hb_Intercept ~ normal( 0 , sigma_B );
+  // ab_Intercept ~ normal( 0 , sigma_B );
+  
+  // hb_Intercept ~ normal( 0 , sigma_B );
 
-  a ~ normal( 0 , 5 );
-  h ~ normal( 0 , 5 );
-  b ~ normal( 0 , 5 );
+  a ~ normal( 0 , 1 );
+  h ~ normal( 0 , 1 );
 
   a_I ~ normal( 0 , 1 );
   h_I ~ normal( 0 , 1 );
-  // b_I ~ normal( 0 , 1 );
   
   a_i ~ normal( 0 , 1 );
   h_i ~ normal( 0 , 1 );
-  // b_i ~ normal( 0 , 1 );
 
   a_pD ~ normal( 0 , 1 );
   h_pD ~ normal( 0 , 1 );
-  // b_pD ~ normal( 0 , 1 );
-  
-  //a_cSize ~ normal( 0 , 1 );
-  //h_cSize ~ normal( 0 , 1 ); 
-  
-  //a_ISize ~ normal( 0 , 1 );
-  //h_ISize ~ normal( 0 , 1 );
   
   a_Egg ~ normal( 0 , 1 );
   h_Egg ~ normal( 0 , 1 );
-  // b_Egg ~ normal(0, 1 );
  
   for ( j in 1:N ) {
-    A[j] = exp(a + a_I * I[j] + a_i * i[j] + a_Intercept[ID[j]] + ab_Intercept[Block[j]] + a_pD *pD[j] + a_Egg *Egg[j]);// + a_pD *pD[j] + a_cSize *cSize[j] + a_ISize *ISize[j] + a_Egg *Egg[j]
-    H[j] = exp(h + h_I * I[j] + h_i * i[j] + h_Intercept[ID[j]] +  hb_Intercept[Block[j]] + h_pD *pD[j] + h_Egg *Egg[j]);//+ h_pD *pD[j] + h_cSize *cSize[j] + h_ISize *ISize[j] + h_Egg *Egg[j]
-    B[j] = exp(b + bb_Intercept[ID[j]] + bb_Intercept[Block[j]]);
-    
-
-    // FR[i] = (A[i]*(R[i])) / (1 + A[i]*H[i]*(R[i]) );
-    FR[j] = (A[j]*(R[j]^B[j])) / (1 + A[j]*H[j]*(R[j]^B[j]) );
+    A[j] = exp(a + a_I * I[j] + a_i * i[j] + a_Intercept[ID[j]] + a_pD *pD[j] + a_Egg *Egg[j]);
+    H[j] = exp(h + h_I * I[j] + h_i * i[j] + h_Intercept[ID[j]] + h_pD *pD[j] + h_Egg *Egg[j]);
+    FR[j] = (A[j]*(R[j])) / (1 + A[j]*H[j]*(R[j]) );
   }
   
   Eaten ~ normal( FR , sigma );

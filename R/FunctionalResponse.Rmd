@@ -297,7 +297,7 @@ library(readxl)
 ```{r}
 # load the data
 data <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
-#data <- read_xlsx("../data/Functional_response_data.xlsx")
+data <- read_xlsx("data/Functional_response_data.xlsx")
 
 #head(data)
 
@@ -366,21 +366,21 @@ dlist = list(
 
 # model <- cmdstan_model("/Users/majadrakula/Desktop/Masterthesis/1_code/FR_model.stan")
 
-model <- cmdstan_model("../R/FR_model.stan")
+model <- cmdstan_model("R/FR_model.stan")
 
-# 
-# fit <- model$sample(
-#     data = dlist,
-#     chains = 4,
-#     parallel_chains = 4,
-#     iter_warmup = 2000,
-#     iter_sampling = 4000,
-#     refresh = 100,
-#     save_warmup = FALSE,
-#     show_messages = TRUE, 
-#     adapt_delta = 0.9,
-#     
-#     )
+
+fit <- model$sample(
+    data = dlist,
+    chains = 4,
+    parallel_chains = 4,
+    iter_warmup = 3000,
+    iter_sampling = 3000,
+    refresh = 100,
+    save_warmup = FALSE,
+    show_messages = TRUE, 
+    adapt_delta = 0.95,
+    
+    )
 
 # save fit as as RDS
 
