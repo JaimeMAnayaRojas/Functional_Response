@@ -297,7 +297,7 @@ library(readxl)
 ```{r}
 # load the data
 data <- read_xlsx("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/Functional_response_data.xlsx")
-data <- read_xlsx("data/Functional_response_data.xlsx")
+#data <- read_xlsx("../data/Functional_response_data.xlsx")
 
 #head(data)
 
@@ -366,27 +366,27 @@ dlist = list(
 
 # model <- cmdstan_model("/Users/majadrakula/Desktop/Masterthesis/1_code/FR_model.stan")
 
-model <- cmdstan_model("R/FR_model.stan")
+model <- cmdstan_model("../R/FR_model.stan")
 
-
-fit <- model$sample(
-    data = dlist,
-    chains = 4,
-    parallel_chains = 4,
-    iter_warmup = 3000,
-    iter_sampling = 3000,
-    refresh = 100,
-    save_warmup = FALSE,
-    show_messages = TRUE, 
-    adapt_delta = 0.95,
-    
-    )
+# 
+# fit <- model$sample(
+#     data = dlist,
+#     chains = 4,
+#     parallel_chains = 4,
+#     iter_warmup = 2000,
+#     iter_sampling = 4000,
+#     refresh = 100,
+#     save_warmup = FALSE,
+#     show_messages = TRUE, 
+#     adapt_delta = 0.9,
+#     
+#     )
 
 # save fit as as RDS
 
 saveRDS(fit, "model.RDS")
 
-fit <- readRDS("model.RDS")
+fit <- readRDS("/Users/majadrakula/Desktop/Masterthesis/0_data/manual/model.RDS")
 
 
 
@@ -396,7 +396,7 @@ sum <- precis(fit, depth = 1, digits = 3)
 
 # save table
 library(openxlsx)
-write.xlsx(sum,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Tables/posterior_sum.xlsx", row.names=TRUE, digits=2)
+#write.xlsx(sum,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Tables/posterior_sum.xlsx", row.names=TRUE, digits=2)
 
 precis(fit, depth = 2)
 
@@ -508,49 +508,71 @@ FR
 
 ```{r}
 # Comparing Handling time and attack coefficient estimates by treatment 
-# create dataframe containing median and 95% HPD intervals for each treatment (C, I, nI)
-selection <- subset(sum, rownames(sum) %in% c("a", "a_I", "a_i", "h", "h_I", "h_i"))
-selection$Group <- rownames(selection)
-rownames(sum) <- NULL
 
-# add estimates column 
-sel <- selection %>%
-  mutate(Estimates = case_when(
-    Group %in% c("a","a_I", "a_i") ~ "attack rate",
-    Group %in% c("h","h_I", "h_i") ~ "handling time",
-    TRUE ~ Group
-  ))
-
-# add treatment column
-Estimates <- sel %>%
-  mutate(Treatment = case_when(
-    Group %in% c("a") ~ "C",
-    Group %in% c("h") ~ "C",
-    Group %in% c("a_I") ~ "I",
-    Group %in% c("h_I") ~ "I",
-    Group %in% c("a_i") ~ "nI",
-    Group %in% c("h_i") ~ "nI",
-    TRUE ~ Group
-  ))
-Est<- Estimates
-
-# plot
-
-
-# second attempt
-AC = exp(post$a)
-AI = exp(post$a_I)
-AnI = exp(post$a_i)
+AC = exp(post$a) # intercep represents the control
+AI = exp(post$a + post$a_I) # add control + deviation from the control (intercept) by I
+AnI = exp(post$a + post$a_i)
 
 HC = exp(post$h)
-HI = exp(post$h_I)
-HnI = exp(post$h_i)
+HI = exp(post$h + post$h_I)
+HnI = exp(post$h + post$h_i)
 
-mediansEst <- c(apply(AC, 2, median), apply(AI, 2, median), apply(AnI, 2, median), apply(HC, 2, median), apply(HI, 2, median), apply(HnI, 2, median))
-CIEst = rbind(t(apply(AC, 2, HPDI, prob = 0.95)), t(apply(AI, 2, HPDI, prob = 0.95)), t(apply(AnI, 2, HPDI, prob = 0.95)), apply(HC, 2, HPDI, prob = 0.95)), t(apply(HI, 2, HPDI, prob = 0.95)), t(apply(HnI, 2, HPDI, prob = 0.95)))
+p_df <- cbind(AC, AI, AnI, HC, HI, HnI)
+
+mediansEst <- apply(p_df, 2, median)
+
+CIEst <- t(apply(p_df, 2, HPDI, prob =0.95))
+
+dfEst <- data.frame(
+    median = mediansEst,
+    lower = CIEst[,1],
+    upper = CIEst[,2],
+    Treatment = c("C", "I", "nI", "C", "I", "nI" ),
+    Parameter = c("a", "a", "a", "h", "h", "h")
+
+)
+
+dfEst <- dfEst %>%
+  mutate(Treatment = factor(Treatment, levels=c("C", "nI", "I"))) 
+
+# split data into h and a
+dfa <- dfEst%>% 
+        filter(Parameter != "h")
+dfh <- dfEst%>% 
+        filter(Parameter != "a")
+
+pd <- position_dodge(0.5)
+aplot <- ggplot(dfa, aes(x=Treatment, y= median, col=Treatment, group=Treatment))+
+         geom_point(size = 4, position = pd) + 
+         geom_errorbar(aes(ymin = lower, ymax = upper) ,  position= pd, width = 0.2, size = 1, alpha= 0.8)+
+         theme_classic() +
+         labs(y="Attack Coefficient Estimates (attacks/hour)" ) +
+        scale_color_manual(values=c("C"= "#339900", "I"= "#9966FF","nI"= "#FF9900"))+
+        scale_fill_manual(values=c("C"= "#339900", "I"= "#9966FF","nI"= "#FF9900"))+
+        theme(text = element_text(size = 12), axis.title = element_text(size = 12), axis.text=element_text(color="black"))+
+        theme(legend.position ="none")+
+        theme(axis.title.x=element_blank())
+
+hplot<- ggplot(dfh, aes(x=Treatment, y= median, col=Treatment, group=Treatment))+
+         geom_point(size = 4, position = pd) + 
+         geom_errorbar(aes(ymin = lower, ymax = upper) ,  position= pd, width = 0.2, size = 1, alpha= 0.8)+
+         theme_classic() +
+         labs(y="Handling time Estimates" ) +
+        scale_color_manual(values=c("C"= "#339900","nI"= "#FF9900", "I"= "#9966FF"))+
+        scale_fill_manual(values=c("C"= "#339900", "nI"= "#FF9900", "I"= "#9966FF"))+
+        theme(text = element_text(size = 12), axis.title = element_text(size = 12), axis.text=element_text(color="black"))+
+        theme(legend.position ="none")+
+        theme(axis.title.x=element_blank())
+
+PlotEstimates<-plot_grid(aplot, hplot, labels = "AUTO")
+
+PlotEstimates
+dev.print(pdf,"/Users/majadrakula/Desktop/Masterthesis/3_output/Figures_Tables/Figures/Estimates.pdf",width=6, height=4) 
+
+
 ```
 
-### Effect of exposure to Functional Response 
+### Effect of exposure on Functional Response 
 ```{r}
 # clean up the workspace
 rm(list = ls())
@@ -575,8 +597,7 @@ data2<-data %>%
   mutate(ID = paste0(Plate, Individual)) %>% 
   filter(Treatment != "infected LV", Treatment != "double infection", Treatment != "triple infection") %>% 
   rename(R = "prey", Infection = "Treatment", Eaten = "prey consumed") %>% 
-  mutate(C = ifelse(Infection == "control", 0,1),
-         E = ifelse(Infection %in% c("infected", "exposed"), 1,0)) 
+  mutate(E = ifelse(Infection ==  "control", 0,1)) 
 
 
 # Fit a stan model using cmdstanr
@@ -601,13 +622,13 @@ dlist2 = list(
   )
 # Now, compile the stan model
 
-# model <- cmdstan_model("/Users/majadrakula/Desktop/Masterthesis/1_code/FR_modelE.stan")
+model <- cmdstan_model("/Users/majadrakula/Desktop/Masterthesis/1_code/FR_modelE.stan")
 
-model <- cmdstan_model("../R/FR_modelE.stan")
+#model <- cmdstan_model("../R/FR_modelE.stan")
 
  
  fitE <- model$sample(
-     data = dlist,
+     data = dlist2,
      chains = 4,
      parallel_chains = 4,
      iter_warmup = 2000,
@@ -621,9 +642,9 @@ model <- cmdstan_model("../R/FR_modelE.stan")
 
 # save fit as as RDS
 
-saveRDS(fitE, "modelE.RDS")
+saveRDS(fitE, "/Users/majadrakula/Desktop/Masterthesis/1_code/modelE.RDS")
 
-fitE <- readRDS("modelE.RDS")
+#fitE <- readRDS("/Users/majadrakula/Desktop/Masterthesis/1_code/modelE.RDS")
 
 
 
@@ -639,7 +660,7 @@ precis(fitE, depth = 2)
 
 # get posteriors from fit
 
-postE <- fitE$draws(format = "dfE")
+postE <- fitE$draws(format = "df")
 
 # estimate the level of support for the hypothesis.
 LOS <- function(x){
@@ -661,15 +682,15 @@ LOS(postE$h_E) # % that is positive
 
 # write predicted values function
 
-p.link <- function(post, R, E){
+p.linkE <- function(postE, R, E){
     
-    A = exp(post$a + post$a_E*E)
+    A = exp(postE$a + postE$a_E*E)
 
-    H = exp(post$h + post$h_E*E)
+    H = exp(postE$h + postE$h_E*E)
 
-    B = exp(post$b)
+    #B = exp(post$b)
 
-    p <- (A * (R^B)) / (1 + A * H * (R^B))
+    p <- (A * R) / (1 + A * H * R)
 
     return(p)
 
@@ -679,8 +700,8 @@ p.link <- function(post, R, E){
 # used sapply to apply the function to the posterior draws
 
 R <- seq(from=0, to =25, by =0.01)
-C <- sapply(1:length(R), function(j) p.link(post, R = R[j], E = 0))
-E <- sapply(1:length(R), function(j) p.link(post, R = R[j], E = 1))
+C <- sapply(1:length(R), function(j) p.linkE(postE, R = R[j], E = 0))
+E <- sapply(1:length(R), function(j) p.linkE(postE, R = R[j], E = 1))
 
 
 
@@ -690,18 +711,19 @@ LOS(C - E)
 # put the median and 95% HPD intervals in a data frame for each treatment (C, I, nI)
 
 mediansE <- c(apply(C, 2, median), apply(E, 2, median))
-CIE = rbind(t(apply(C, 2, HPDI, prob = 0.95)), t(apply(E, 2, HPDI, prob = 0.95)))
+ CIE <- rbind(t(apply(C, 2, HPDI, prob = 0.95)), t(apply(E, 2, HPDI, prob = 0.95)))
 
 
-dfE <- data.frame(
-    R = rep(R, 3),
-    median = mediansE,
-    lower = CIE[,1],
-    upper = CIE[,2],
+ dfE <- data.frame(
+    R = rep(R, 2),
+    #median = mediansE,
+    #lower = CIE[,1],
+    #upper = CIE[,2],
     Treatment = rep(c("C", "E"), each = length(R))
 
 )
-df
+dfE
+rep(c("C","E"), each= 10)
 ```
 
 
